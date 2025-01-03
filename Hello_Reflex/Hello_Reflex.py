@@ -1,4 +1,5 @@
 import reflex as rx
+from collections import Counter
 
 class User(rx.Base):
     # The user model.
@@ -19,9 +20,26 @@ class State(rx.State):
             gender="Female",
         ),
     ]
+    users_for_graph: list[dict] = []
 
     def add_user(self, form_data: dict):
         self.users.append(User(**form_data))
+        self.transform_data()
+    
+    def transform_data(self):
+        """
+        Transform user gender group data into a format suitable for visualization in graphs.
+        Count users of each gender group.
+        """
+        gender_counts = Counter(
+            user.gender for user in self.users
+        )
+
+        # Transform into list of dict so it can be used in the graph.
+        self.users_for_graph = [
+            {"name": gender_group, "value": count}
+            for gender_group, count in gender_counts.items()
+        ]
 
 def show_user(user: User):
     # Show a person in a table row.
@@ -29,6 +47,10 @@ def show_user(user: User):
         rx.table.cell(user.name),
         rx.table.cell(user.email),
         rx.table.cell(user.gender),
+        style={"_hover":
+            {"bg": rx.color("gray", 3)}
+        },
+        align="center",
     )
 
 def add_customer_button() -> rx.Component:
@@ -81,6 +103,20 @@ def add_customer_button() -> rx.Component:
         ),
     )
 
+def graph():
+    return rx.recharts.bar_chart(
+        rx.recharts.bar(
+            data_key="value",
+            stroke=rx.color("accent", 9),
+            fill=rx.color("accent", 8),
+        ),
+        rx.recharts.x_axis(data_key="name"),
+        rx.recharts.y_axis(),
+        data=State.users_for_graph,
+        width="100%",
+        height=250,
+    )
+
 def index() -> rx.Component:
     return rx.vstack(
         add_customer_button(),
@@ -97,8 +133,19 @@ def index() -> rx.Component:
             ),
             variant="surface",
             size="3",
+            width="100%",
         ),
+        graph(),
+        align="center",
+        width="100%",
     )
 
-app = rx.App()
-app.add_page(index)
+app = rx.App(
+    theme=rx.theme(radius="full", accent_color="grass"),
+)
+app.add_page(
+    index, 
+    title="Customer Data App",
+    description="A simple app to manage customer data.",
+    on_load=State.transform_data,
+)
